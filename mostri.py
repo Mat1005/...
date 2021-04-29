@@ -101,9 +101,9 @@ class Field:
   def __init__(self, levelNumber):
     self.entities = []
     self.score = 0
-    self.levelNumber = levelNumber
+    self.levelNumber = n
     self.livingentities = []
-    f = open("./level" + str(levelNumber) + ".txt", "r")
+    f = open("./level" + str(n) + ".txt", "r")
     rows = f.read().split("\n")
     f.close()
 
