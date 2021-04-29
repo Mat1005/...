@@ -58,25 +58,22 @@ class Living_Entity(Entity):
     self.hp = hp
     self.max_hp = hp
     self.damage = damage
+    self.field.livingentities.append(self)
 
   def info(self):
     print("sono", self.name, "hp:", self.hp, "/", self.max_hp, "e mi trovo a", self.x, ",", self.y)
 
   def attack(self, enemy):
-    if self.hp <= 0:
-      print(self.name, "prova ad attaccare da morto con scarsi risultati")
-    else: 
-      print(self.name, "attacca", enemy.name)
-
-      if (enemy.hp <= 0):
-        print(enemy.name, "e' morto")
-        self.field.entities.remove(enemy)
-      else:
-        enemy.hp -= self.damage
+    print(self.name, "attacca", enemy.name)
+    enemy.hp -= self.damage
+    if enemy.hp <= 0:
+      print(enemy.name, "è morto")
+      self.field.livingentities.remove(enemy)
+      self.field.entities.remove(enemy)
 
 class Monster(Living_Entity):
   def __init__(self, x, y, name, field):
-    super().__init__(x, y, name, 10, 5, field, "m")
+    super().__init__(x, y, name, 1, 5, field, "m")
     
   def collide(self, entity):
     if isinstance(entity, Player):
@@ -91,7 +88,7 @@ class Monster(Living_Entity):
 
 class Player(Living_Entity):
   def __init__(self, x, y, name, field):
-    super().__init__(x, y, name, 20, 5, field, "p")
+    super().__init__(x, y, name, 80, 40, field, "p")
   
   def collide(self, entity):
     if isinstance(entity, Monster):
@@ -105,7 +102,7 @@ class Field:
     self.entities = []
     self.score = 0
     self.levelNumber = levelNumber
-  
+    self.livingentities = []
     f = open("./level" + str(levelNumber) + ".txt", "r")
     rows = f.read().split("\n")
     f.close()
@@ -148,6 +145,19 @@ class Field:
   def update(self):
     for e in self.entities:
       e.update()
+def check_victory(field):
+    global vittoria
+    global sconfitta
+    vittoria = False
+    sconfitta = False
+    istherePlayer = False
+    for e in field.livingentities:
+        if isinstance(e, Player):
+            istherePlayer = True
+        if len(field.livingentities) == 1:
+            vittoria = True
+    if istherePlayer == False:
+        sconfitta = True
 
 field = Field(n)
 
@@ -158,7 +168,21 @@ def clear_screen():
     os.system("clear")
     
 clear_screen()
-while True:  
+while True:
+    
+  check_victory(field)
+  if vittoria == True:
+    if n < 4:
+      field.levelNumber += 1
+      n += 1
+      print("livello", n)
+      field.__init__(n)
+    else:
+      print("hai vinto")
+      break
+  elif sconfitta == True:
+    print("hai perso")
+    break
   field.update()
   field.draw()
 
