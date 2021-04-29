@@ -181,7 +181,7 @@ while True:
       print("hai vinto")
       break
   elif sconfitta == True:
-    print("hai perso")
+    print("GAME OVER")
     break
   field.update()
   field.draw()
