@@ -1,16 +1,31 @@
-n = 1
+import os
+from random import choice
+
+DIRECTIONS = "up", "down", "left", "right"
+number_file = 4
+
 import os
 from random import choice
 
 DIRECTIONS = "up", "down", "left", "right"
 
+def clear_screen():
+  if os.name == "nt":
+    os.system("cls")
+  else:
+    os.system("clear")
+
 class Entity: 
   def __init__(self, x, y, field, graphic):
     self.x = x
     self.y = y
+    self.graphic = graphic
+    if field != None:
+      self.add_to_field(field)
+
+  def add_to_field(self, field):
     self.field = field
     self.field.entities.append(self)
-    self.graphic = graphic
 
   def move(self, direction):
     futureX = self.x
@@ -58,22 +73,26 @@ class Living_Entity(Entity):
     self.hp = hp
     self.max_hp = hp
     self.damage = damage
-    self.field.livingentities.append(self)
+
 
   def info(self):
     print("sono", self.name, "hp:", self.hp, "/", self.max_hp, "e mi trovo a", self.x, ",", self.y)
 
   def attack(self, enemy):
-    print(self.name, "attacca", enemy.name)
-    enemy.hp -= self.damage
-    if enemy.hp <= 0:
-      print(enemy.name, "è morto")
-      self.field.livingentities.remove(enemy)
-      self.field.entities.remove(enemy)
+    if self.hp <= 0:
+      print(self.name, "prova ad attaccare da morto con scarsi risultati")
+    else: 
+      print(self.name, "attacca", enemy.name)
+
+      if (enemy.hp <= 0):
+        print(enemy.name, "e' morto")
+        self.field.entities.remove(enemy)
+      else:
+        enemy.hp -= self.damage
 
 class Monster(Living_Entity):
   def __init__(self, x, y, name, field):
-    super().__init__(x, y, name, 1, 5, field, "m")
+    super().__init__(x, y, name, 10, 5, field, "m")
     
   def collide(self, entity):
     if isinstance(entity, Player):
@@ -87,23 +106,32 @@ class Monster(Living_Entity):
     self.move()
 
 class Player(Living_Entity):
-  def __init__(self, x, y, name, field):
-    super().__init__(x, y, name, 80, 40, field, "p")
+  def __init__(self, x, y, name, field, game):
+    super().__init__(x, y, name, 20, 5, field, "p")
+    self.game = game
   
   def collide(self, entity):
     if isinstance(entity, Monster):
       self.attack(entity)
     elif isinstance(entity, Gold):
-      self.field.score += entity.value
+      self.game.score += entity.value
       self.field.entities.remove(entity)
 
 class Field:
-  def __init__(self, levelNumber):
+  def __init__(self, level_number, player):
     self.entities = []
-    self.score = 0
-    self.levelNumber = n
-    self.livingentities = []
-    f = open("./level" + str(n) + ".txt", "r")
+    self.level_number = level_number
+    self.player = player
+
+  def has_gold(self):
+    for e in self.entities:
+      if isinstance(e, Gold):
+        return True
+    
+    return False
+
+  def load_level(self):
+    f = open("./level" + str(self.level_number) + ".txt", "r")
     rows = f.read().split("\n")
     f.close()
 
@@ -115,7 +143,9 @@ class Field:
       for x in range(self.w):
         char = row[x]
         if char == "p":
-          self.player = Player(x, y, "Player", self)
+          self.player.x = x
+          self.player.y = y
+          self.player.add_to_field(self)
         elif char == "#":
           Wall(x, y, self)
         elif char == "$":
@@ -131,7 +161,6 @@ class Field:
     return None
     
   def draw(self):
-    print("score:", self.score)
     for y in range(self.h):
       for x in range(self.w):
         for e in self.entities:
@@ -145,52 +174,69 @@ class Field:
   def update(self):
     for e in self.entities:
       e.update()
-def check_victory(field):
-    global vittoria
-    global sconfitta
-    vittoria = False
-    sconfitta = False
-    istherePlayer = False
-    for e in field.livingentities:
-        if isinstance(e, Player):
-            istherePlayer = True
-        if len(field.livingentities) == 1:
-            vittoria = True
-    if istherePlayer == False:
-        sconfitta = True
 
-field = Field(n)
+class Game:
+  def __init__(self, levels):
+    self.score = 0
+    self.player = Player(0, 0, "Player", None, self)
+    self.fields = []
+    self.levels = levels
+    for i in range(1, levels + 1):
+      self.fields.append(Field(i, self.player))
+    
+    self.current_field = None
+    self.current_level_index = -1
+    self.status = "STOPPED"
 
-def clear_screen():
-  if os.name == "nt":
-    os.system("cls")
-  else:
-    os.system("clear")
-    
-clear_screen()
-while True:
-    
-  check_victory(field)
-  if vittoria == True:
-    if n < 4:
-      field.levelNumber += 1
-      n += 1
-      print("livello", n)
-      field.__init__(n)
+  def next_level(self):
+    self.status = "RUNNING"
+    if self.current_level_index < self.levels - 1:
+      self.current_level_index += 1
+      self.current_field = self.fields[self.current_level_index]
+      self.current_field.load_level()
     else:
-      print("hai vinto")
-      break
-  elif sconfitta == True:
-    print("GAME OVER")
-    break
-  field.update()
-  field.draw()
+      self.win()
+
+
+  def win(self):
+    clear_screen()
+    self.status = "STOPPED"
+    print("THE WINNER IS YOU!")
+
+  def game_over(self):
+    clear_screen()
+    self.status = "STOPPED"
+    print("GAME OVER!")
+
+  def update(self):
+    if self.status == "RUNNING":
+      self.current_field.update()
+      if self.player.hp <= 0:
+        self.game_over()
+
+      if self.current_field.has_gold() == False:
+        self.next_level()
+  
+  def draw(self):
+    if self.status == "RUNNING":
+      print(self.score)
+      self.current_field.draw()
+
+game = Game(number_file)
+game.next_level()
+
+clear_screen()
+while True:  
+  game.update()
+  game.draw()
 
   command = input("input: ").lower()
   clear_screen()
 
   if command == "q": break
-  elif command == "w": field.player.move("up")
-  elif command == "a": field.player.move("left")
-  elif command == "s": field.player.move("down")
-  elif command == "d": field.player.move("right")
+  elif command == "w": game.player.move("up")
+  elif command == "a": game.player.move("left")
+  elif command == "s": game.player.move("down")
+  elif command == "d": game.player.move("right")
+  elif command == "z": game.next_level()
+  
